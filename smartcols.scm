@@ -1,7 +1,15 @@
 #! /usr/bin/env guile
 !#
 
+;;; module smartcols provide bindings to the smartcols library. It allows
+;;; you to defined tables and print them from guile programmaticaly.
+;;; The module wraps the underlying pointers so that they are available as values.
+;;; The module wraps the underlying functions so that they are available as procedures.
+;;; Procedures exposed by the module work on values instead of raw pointers.
+
 ;;; Copyright 2023 Edoardo Putti
+;;; Released under the GPLv3 license
+
 ;;; TODO(edoput) define-smartcols-ffi macro
 ;;; TODO(edoput) define-smartcols-ffi should handle wrapped pointers
 ;;; TODO(edoput) define-smartcols-ffi should handle int as return type to raise error
@@ -85,7 +93,9 @@
 			    #:return-type '*
 			    #:arg-types '()))
 
-(define (make-table) (wrap-table (make-table-ffi)))
+(define (make-table)
+  "Creates and returns a new table instance."
+  (wrap-table (make-table-ffi)))
 
 
 (define table-empty?-ffi
@@ -94,6 +104,7 @@
 			    #:return-type int
 			    #:arg-types '(*)))
 (define (empty? table)
+  "Returns #t if table is empty."
   (= 1 (table-empty?-ffi (unwrap-table table))))
 
 (define table-width-ffi
@@ -102,6 +113,7 @@
 			    #:return-type int
 			    #:arg-types '(*)))
 (define (width table)
+  "Returns the table's width."
   (table-width-ffi (unwrap-table table)))
 
 (define table-height-ffi
@@ -111,6 +123,7 @@
 			    #:arg-types '(*)))
 
 (define (height table)
+  "Returns the table's height."
   (table-height-ffi (unwrap-table table)))
 
 
@@ -121,6 +134,7 @@
 			    #:arg-types '(*)))
 
 (define (ascii? table)
+  "Returns #t if using ASCII characters for tree-like outputs."
   (= 1 (table-ascii?-ffi (unwrap-table table))))
 
 (define table-maximised?-ffi
@@ -130,8 +144,15 @@
 			    #:arg-types '(*)))
 
 (define (maximised? table)
+  "Returns #t is the table is set to maximised."
   (= 1 (table-maximised?-ffi (unwrap-table table))))
 
+;;; Parsable output formats
+;;; libsmartcols supports exporting a table in different parseable formats.
+;;; Currently there is implemented support for raw, export, and JSON format.
+;;; The formats are mutually exclusive.
+
+;;; raw output format
 (define table-raw?-ffi
   (foreign-library-function libsmartcols
 			    "scols_table_is_raw"
@@ -139,7 +160,30 @@
 			    #:arg-types '(*)))
 
 (define (raw? table)
+  "Returns #t if the table is set to raw output format."
   (= 1 (table-raw?-ffi (unwrap-table table))))
+
+;;; export output format
+(define table-enabled-export-ffi
+  (foreign-library-function libsmartcols
+			    "scols_table_enable_export"
+			    #:return-type int
+			    #:arg-types (list '* int)))
+
+(define (set-export! table enabled)
+  "Enable/disable export format."
+  (table-enabled-export-ffi (unwrap-table table) (if enabled 1 0)))
+
+;;; JSON output format
+(define table-enabled-json-ffi
+  (foreign-library-function libsmartcols
+			    "scols_table_enable_json"
+			    #:return-type int
+			    #:arg-types (list '* int)))
+
+(define (set-json! table enabled)
+  (table-enabled-export-ffi (unwrap-table table) (if enabled 1 0)))
+
 
 (define table-tree?-ffi
   (foreign-library-function libsmartcols
@@ -148,6 +192,7 @@
 			    #:arg-types '(*)))
 
 (define (tree? table)
+  "Returns #t if the table is a tree."
   (= 1 (table-tree?-ffi (unwrap-table table))))
 
 (define table-colored?-ffi
@@ -157,6 +202,7 @@
 			    #:arg-types '(*)))
 
 (define (colored? table)
+  "Returns #t if the table is set to colored."
   (= 1 (table-colored?-ffi table)))
 
 (define table-enable-colors-ffi
@@ -166,16 +212,9 @@
 			    #:arg-types (list '* int)))
 
 (define (set-colored! table enabled)
+  "Enable/disable colored output."
   (table-enable-colors-ffi (unwrap-table table) (if enabled 1 0)))
 
-(define table-enabled-export-ffi
-  (foreign-library-function libsmartcols
-			    "scols_table_enable_export"
-			    #:return-type int
-			    #:arg-types (list '* int)))
-
-(define (set-export! table enabled)
-  (table-enabled-export-ffi (unwrap-table table) (if enabled 1 0)))
 
 (define table-enabled-ascii-ffi
   (foreign-library-function libsmartcols
@@ -184,6 +223,7 @@
 			    #:arg-types (list '* int)))
 
 (define (set-ascii! table enabled)
+  "Enable/disable ASCII output."
   (table-enabled-ascii-ffi (unwrap-table table) (if enabled 1 0)))
 
 (define table-get-stream-ffi
@@ -214,6 +254,7 @@
 			    #:arg-types (list '* size_t)))
 
 (define (get-line table nth)
+  "Returns the nth line of table."
   (wrap-line (get-table-line-ffi (unwrap-table table) nth)))
 
 (define table-new-line-ffi
@@ -229,16 +270,19 @@
 			    #:arg-types (list '* '*)))
 
 (define (new-line! table)
+  "Creates a new line for table and returns it."
   (wrap-line
    (table-new-line-ffi (unwrap-table table)
 		       %null-pointer)))
 
 (define (new-line-child! table parent-line)
+  "Creates a new line for table as a child of parent-line and returns it."
   (wrap-line
    (table-new-line-ffi (unwrap-table table)
 		       (unwrap-line parent-line))))
 
 (define (add-line! table line)
+  "Adds line to table."
   (table-add-line-ffi (unwrap-table table) (unwrap-line line)))
 
 (define remove-line-ffi
@@ -248,6 +292,7 @@
 			    #:arg-types (list '* '*)))
 
 (define (remove-line! table line)
+  "Removes line from table."
   (remove-line-ffi (unwrap-table table)
 		   (unwrap-line line)))
 
@@ -258,6 +303,7 @@
 			    #:arg-types '(*)))
 
 (define (remove-lines! table)
+  "Removes all lines from table."
   (remove-lines-ffi (unwrap-table table)))
 
 (define get-table-column-ffi
@@ -267,6 +313,7 @@
 			    #:arg-types (list '* size_t)))
 
 (define (get-column table nth)
+  "Returns the nth column from table."
   (wrap-column (get-table-column-ffi (unwrap-table table) nth)))
 
 (define make-table-column-ffi
@@ -275,7 +322,8 @@
 			    #:return-type '*
 			    #:arg-types (list '* '* double int)))
 
-(define (new-column! table name width flags) 
+(define (new-column! table name width flags)
+  "Creates a new column for table with the attributes name, width, flags."
   (wrap-column
    (make-table-column-ffi (unwrap-table table)
 			  (string->pointer name)
@@ -289,6 +337,7 @@
 			    #:arg-types (list '* '*)))
 
 (define (remove-column! table column)
+  "Removes column from table."
   (remove-column-ffi (unwrap-table table)
 		     (unwrap-column column)))
 
@@ -300,6 +349,7 @@
 			    #:arg-types '(*)))
 
 (define (remove-columns! table)
+  "Removes all columns from table."
   (remove-columns-ffi (unwrap-table table)))
 
 ;;; column manipulation
@@ -310,7 +360,9 @@
 			    #:arg-types '()))
 
 
-(define (make-column) (wrap-column (make-column-ffi)))
+(define (make-column)
+  "Creates and returns a column."
+  (wrap-column (make-column-ffi)))
 
 
 ;;; line manipulation
@@ -321,7 +373,9 @@
 			    #:return-type '*
 			    #:arg-types '()))
 
-(define make-line (wrap-line (make-line-ffi)))
+(define (make-line)
+  "Creates and returns a line."
+  (wrap-line (make-line-ffi)))
 
 (define line-color-ffi
   (foreign-library-function libsmartcols
@@ -330,6 +384,7 @@
 			    #:arg-types '(*)))
 
 (define (color line)
+  "Returns a string value representing the color of line."
   (pointer->string (line-color-ffi (unwrap-line line))))
 
 (define line-set-color-ffi
@@ -339,6 +394,7 @@
 			    #:arg-types '(* *)))
 
 (define (set-color! line color)
+  "Set the line color to the value represented by the string value color."
   (line-set-color-ffi (unwrap-line line) (string->pointer color "ascii")))
 
 (define line-parent-ffi
@@ -348,6 +404,7 @@
 			    #:arg-types '(*)))
 
 (define (line-parent line)
+  "Returns the parent of line."
   (wrap-line (line-parent-ffi (unwrap-line line))))
 
 (define line-leaf-ffi
@@ -357,6 +414,7 @@
 			    #:arg-types '(*)))
 
 (define (leaf? line)
+  "Returns #t if line is a leaf."
   (= 0 (line-leaf-ffi (unwrap-line line))))
 
 (define remove-line-child-ffi
@@ -366,6 +424,7 @@
 			    #:arg-types (list '* '*)))
 
 (define (remove-child! parent-line child-line)
+  "Removes the parent-child relation between parent-line and child-line."
   (remove-line-child-ffi (unwrap-line parent-line)
 			 (unwrap-line child-line)))
 
@@ -382,6 +441,7 @@
 			    #:arg-types '(* * *)))
 
 (define (set-line-column-data! line column data)
+  "Set the cell at the intersection line, column to hold the string value data. "
   (cond
    ;; by offset
    [(integer? column)
@@ -412,6 +472,7 @@
 
 ;;; TODO(edoput) this requires going through FILE*. I'm not sure how to go through this.
 (define (table->string table)
+  "Returns the string representation of table."
   (with-output-to-string 
     (λ ()
       (let [(previous (table-get-stream-ffi (unwrap-table table)))] ;TODO(edoput) replace with dynamic-wind
